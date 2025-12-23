@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bé Cậu</title>
+
+<style>
+body {
+  margin: 0;
+  background: linear-gradient(#0b1220,#020617);
+  color: #e5e7eb;
+  font-family: system-ui;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  text-align: center;
+  padding: 12px;
+  font-weight: 700;
+  background: #0f172a;
+}
+
+#chat {
+  flex: 1;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.msg {
+  max-width: 85%;
+  padding: 12px;
+  border-radius: 14px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.ai { background: #1f2937; }
+.user { background: #2563eb; margin-left: auto; }
+
+#status {
+  text-align: center;
+  font-size: 13px;
+  color: #9ca3af;
+  padding: 4px;
+}
+
+#inputBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid #1e293b;
+}
+
+textarea {
+  flex: 1;
+  resize: none;
+  border-radius: 12px;
+  padding: 10px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+}
+
+button {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  font-size: 18px;
+}
+
+#mic { background:#16a34a; color:white; }
+#send { background:#2563eb; color:white; }
+
+/* 🔊 Speed control */
+#voiceCtl {
+  position: fixed;
+  bottom: 70px;
+  right: 10px;
+}
+
+#speedBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background:#1e293b;
+  color:white;
+  border:none;
+}
+
+#speedBox {
+  display:none;
+  background:#020617;
+  padding:6px;
+  border-radius:10px;
+  margin-top:4px;
+}
+
+#speedBox input {
+  width:90px;
+}
+</style>
+</head>
+
+<body>
+
+<header>🤖 Bé Cậu</header>
+
+<div id="chat">
+  <div class="msg ai">
+    Xin chào 👋<br>
+    Mình là Bé Cậu. Bạn cứ nói hoặc gõ, mình đang lắng nghe.
+  </div>
+</div>
+
+<div id="status">🟢 Bé Cậu sẵn sàng</div>
+
+<div id="inputBar">
+  <button id="mic">🎤</button>
+  <textarea id="text" rows="1" placeholder="Nói hoặc nhập..."></textarea>
+  <button id="send">➤</button>
+</div>
+
+<div id="voiceCtl">
+  <button id="speedBtn">🔊</button>
+  <div id="speedBox">
+    <input id="speed" type="range" min="4" max="8" value="6">
+  </div>
+</div>
+
+<script>
+/* ===== STATE ===== */
+let recognizing=false, finalText="", lastChange=0, sent=false;
+
+/* ===== ELEMENTS ===== */
+const chat=document.getElementById("chat");
+const text=document.getElementById("text");
+const status=document.getElementById("status");
+
+/* ===== UTIL ===== */
+function add(role,content){
+  const d=document.createElement("div");
+  d.className="msg "+role;
+  d.textContent=content;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function stopSpeak(){ speechSynthesis.cancel(); }
+
+/* ===== TTS ===== */
+function speak(t){
+  stopSpeak();
+  const u=new SpeechSynthesisUtterance(t);
+  u.rate=document.getElementById("speed").value/6;
+  speechSynthesis.speak(u);
+}
+
+/* ===== SEND ===== */
+async function sendMsg(c){
+  if(!c.trim()||sent) return;
+  sent=true;
+  add("user",c);
+  text.value="";
+  status.textContent="⏳ Bé Cậu đang trả lời...";
+
+  const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:c})});
+  const d=await r.json();
+  add("ai",d.reply);
+  speak(d.reply);
+  status.textContent="🟢 Bé Cậu sẵn sàng";
+  sent=false;
+}
+
+/* ===== MIC ===== */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const rec=new SR();
+rec.lang="vi-VN";
+rec.continuous=true;
+rec.interimResults=true;
+
+rec.onstart=()=>{
+  recognizing=true;
+  finalText="";
+  stopSpeak();
+  status.textContent="🎤 Bé Cậu đang nghe...";
+};
+
+rec.onresult=e=>{
+  let temp="";
+  for(let i=e.resultIndex;i<e.results.length;i++){
+    if(e.results[i].isFinal){
+      finalText+=e.results[i][0].transcript.trim()+" ";
+    } else {
+      temp=e.results[i][0].transcript;
+    }
+  }
+  text.value=finalText+temp;
+  lastChange=Date.now();
+};
+
+rec.onend=()=>recognizing=false;
+
+/* 🧠 SMART END */
+setInterval(()=>{
+  if(!recognizing||sent) return;
+  if(!finalText.trim()) return;
+
+  const stable=Date.now()-lastChange>1200;
+  const longEnough=finalText.trim().length>8;
+  const end=/[.!?]$/.test(finalText.trim());
+
+  if(stable&&longEnough&&end){
+    rec.stop();
+    sendMsg(finalText.trim());
+    finalText="";
+  }
+},300);
+
+/* ===== EVENTS ===== */
+document.getElementById("mic").onclick=()=>{ if(!recognizing) rec.start(); };
+document.getElementById("send").onclick=()=>{ stopSpeak(); sendMsg(text.value); };
+
+text.oninput=()=>{
+  stopSpeak();
+  text.style.height="auto";
+  text.style.height=text.scrollHeight+"px";
+};
+
+/* Speed toggle */
+speedBtn.onclick=()=>speedBox.style.display=speedBox.style.display?"":"block";
+</script>
+
+</body>
+</html>

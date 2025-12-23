@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bé Cậu</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#0b1220;color:#fff;display:flex;flex-direction:column;height:100vh}
+header{padding:12px;text-align:center;background:#0f1a30;font-weight:600}
+#chat{flex:1;overflow-y:auto;padding:12px}
+.msg{max-width:85%;padding:12px;margin-bottom:10px;border-radius:16px;line-height:1.5}
+.ai{background:#1c2942}
+.user{background:#2563eb;margin-left:auto}
+footer{padding:10px;background:#0f1a30}
+.row{display:flex;gap:8px;align-items:center}
+textarea{flex:1;border:none;border-radius:18px;padding:10px 14px;font-size:16px;outline:none;resize:none}
+button{width:42px;height:42px;border:none;border-radius:50%;font-size:18px}
+#mic{background:#16a34a}
+#send{background:#2563eb}
+#status{font-size:13px;opacity:.7;text-align:center;margin-top:6px}
+#speed{width:90px}
+</style>
+</head>
+
+<body>
+
+<header>🤖 Bé Cậu</header>
+
+<div id="chat">
+  <div class="msg ai">
+    Xin chào 👋<br>
+    Mình là Bé Cậu.<br>
+    Bạn cứ nói hoặc gõ, mình đang lắng nghe.
+  </div>
+</div>
+
+<footer>
+  <div class="row">
+    <button id="mic">🎤</button>
+    <textarea id="text" rows="1" placeholder="Nói hoặc nhập..."></textarea>
+    <button id="send">➤</button>
+  </div>
+
+  <div class="row" style="margin-top:6px;font-size:13px;opacity:.8">
+    🔊 <input id="speed" type="range" min="0.8" max="1.6" step="0.1" value="1.2">
+    <span id="status">Bé Cậu sẵn sàng</span>
+  </div>
+</footer>
+
+<script>
+const chat=document.getElementById("chat");
+const text=document.getElementById("text");
+const status=document.getElementById("status");
+
+let isRecording=false;
+let finalText="";
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const rec=new SR();
+
+/* ===== KHÓA NGUYÊN NHÂN LẶP ===== */
+rec.lang="vi-VN";
+rec.continuous=false;        // ❌ KHÔNG continuous
+rec.interimResults=false;    // ❌ KHÔNG realtime
+
+rec.onresult=e=>{
+  finalText=e.results[0][0].transcript.trim();
+};
+
+rec.onend=()=>{
+  isRecording=false;
+  status.textContent="Bé Cậu sẵn sàng";
+  if(finalText){
+    text.value=finalText;   // ✅ ĐỔ 1 LẦN DUY NHẤT
+    finalText="";
+  }
+};
+
+document.getElementById("mic").onclick=()=>{
+  if(isRecording) return;
+  finalText="";
+  rec.start();
+  isRecording=true;
+  status.textContent="🎤 Đang nghe...";
+  stopSpeak();
+};
+
+document.getElementById("send").onclick=()=>{
+  const msg=text.value.trim();
+  if(!msg) return;
+
+  addMsg(msg,"user");
+  text.value="";
+
+  fetch("/chat",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({text:msg})
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    addMsg(d.reply,"ai");
+    speak(d.reply);
+  });
+};
+
+function addMsg(t,cls){
+  const div=document.createElement("div");
+  div.className="msg "+cls;
+  div.textContent=t;
+  chat.appendChild(div);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function speak(t){
+  stopSpeak();
+  const u=new SpeechSynthesisUtterance(t);
+  u.lang="vi-VN";
+  u.rate=document.getElementById("speed").value;
+  speechSynthesis.speak(u);
+}
+function stopSpeak(){speechSynthesis.cancel()}
+</script>
+
+</body>
+</html>

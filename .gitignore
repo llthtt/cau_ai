@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Runtime data
+*.db
+*.json
+sessions/
+memory/
+logs/
+upgrade_log.json
+
+# Environment
+.env
+
+# OS
+.DS_Store
