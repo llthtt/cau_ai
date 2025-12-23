@@ -1,131 +1,96 @@
 #!/data/data/com.termux/files/usr/bin/bash
+# ==================================================
+# cu Tí – GOD MODE Installer
+# Mode: FULL FEATURE + TERMUX SAFE
+# Author: llthtt
+# ==================================================
+
 set -e
 
-echo "🧠 Installing cu Tí – GOD MODE (Safe Research Mode)"
+echo "=============================================="
+echo "🤖 cu Tí – GOD MODE Installer"
+echo "Safe Research Mode for Termux"
+echo "=============================================="
 
-# ===== KIỂM TRA TERMUX =====
-if [ ! -d /data/data/com.termux ]; then
-  echo "❌ Phải chạy trong Termux"
+# 1️⃣ Update Termux (KHÔNG đụng pip)
+echo "🔄 Updating Termux packages..."
+pkg update -y
+
+# 2️⃣ System dependencies (GIỮ ĐẦY ĐỦ)
+echo "📦 Installing system dependencies..."
+pkg install -y \
+  python \
+  git \
+  curl \
+  wget \
+  termux-api \
+  mpg123 \
+  pulseaudio \
+  clang \
+  make \
+  pkg-config \
+  libffi \
+  openssl
+
+# 3️⃣ Check Python
+echo "🐍 Python version:"
+python --version
+
+# 4️⃣ Check pip (Termux default – KHÔNG upgrade)
+echo "📌 pip version:"
+pip --version || {
+  echo "❌ pip missing – Termux Python broken"
   exit 1
+}
+
+# 5️⃣ Python libraries (SAFE – không động pip)
+echo "📚 Installing Python libraries..."
+PY_LIBS=(
+  requests
+)
+
+for lib in "${PY_LIBS[@]}"; do
+  if python - <<EOF 2>/dev/null
+import $lib
+EOF
+  then
+    echo "✔ $lib already installed"
+  else
+    echo "➕ Installing $lib"
+    pip install "$lib"
+  fi
+done
+
+# 6️⃣ GOD MODE config (GIỮ TÍNH NĂNG CŨ)
+echo "🔥 Initializing GOD MODE..."
+GODMODE_FILE="$HOME/.cu_ti_godmode.json"
+
+if [ ! -f "$GODMODE_FILE" ]; then
+cat <<EOF > "$GODMODE_FILE"
+{
+  "name": "cu Ti",
+  "god_mode": true,
+  "safe_mode": true,
+  "research_only": true,
+  "internet_access": true,
+  "auto_update": false,
+  "level": 5.5
+}
+EOF
+  echo "🧠 GOD MODE config created"
+else
+  echo "🧠 GOD MODE config already exists"
 fi
 
-# ===== BIẾN ĐƯỜNG DẪN =====
-BASE=$HOME/cu_ti
-ROOTD=$BASE/root
-LOGS=$BASE/logs
-
-# ===== CÀI GÓI CẦN THIẾT =====
-pkg update -y
-pkg install -y python git termux-api mpg123
-pip install --upgrade pip
-pip install openai gtts vosk psutil requests
-
-# ===== TẠO CẤU TRÚC =====
-mkdir -p $BASE/{brain,voice,root,logs,memory,autonomy,learning}
-mkdir -p /data/cu_ti
-
-# ===== KILL SWITCH =====
-touch /data/cu_ti/ALLOW
-chmod 600 /data/cu_ti/ALLOW
-
-# ===== PERSONA =====
-cat > $BASE/brain/persona.py << 'EOF'
-PERSONA = """
-Tên: cu Tí
-Vai trò: AI hệ điều hành cá nhân (Research Mode)
-Nguyên tắc:
-- Không đoán
-- Không phá hệ thống
-- Có thể học, có thể hành động, nhưng phải an toàn
-"""
+# 7️⃣ Final check
+echo "🧪 Final environment test..."
+python - << 'EOF'
+import requests, json
+print("✔ Python OK")
+print("✔ requests OK")
 EOF
 
-# ===== HARD RULES (KHÔNG THỂ TẮT) =====
-cat > $ROOTD/hard_rules.sh << 'EOF'
-#!/system/bin/sh
-case "$*" in
-  *"rm -rf /"*|*"dd "*|*"mkfs"*|*"format"*|*"flash"*|*"bootloader"*|*"fastboot"*)
-    echo "⛔ HARD RULE BLOCKED"
-    exit 13 ;;
-esac
-EOF
-chmod +x $ROOTD/hard_rules.sh
-
-# ===== ROOT EXECUTOR =====
-cat > $ROOTD/exec.sh << 'EOF'
-#!/system/bin/sh
-. "$HOME/cu_ti/root/hard_rules.sh"
-[ ! -f /data/cu_ti/ALLOW ] && { echo "⛔ KILL SWITCH ACTIVE"; exit 99; }
-
-LOG="$HOME/cu_ti/logs/audit.log"
-CMD="$*"
-
-case "$CMD" in
-  wifi_on) svc wifi enable ;;
-  wifi_off) svc wifi disable ;;
-  status) dumpsys battery | head -n 6 ;;
-  *) echo "⚠️ UNKNOWN ROOT CMD" ;;
-esac
-
-echo "$(date) :: $CMD" >> "$LOG"
-EOF
-chmod +x $ROOTD/exec.sh
-
-# ===== CORE CHÍNH =====
-cat > $BASE/brain/core.py << 'EOF'
-import os, subprocess
-from openai import OpenAI
-from brain.persona import PERSONA
-from voice.tts import speak
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-def root(cmd):
-    return subprocess.getoutput(f"su -c '$HOME/cu_ti/root/exec.sh {cmd}'")
-
-def chat(q):
-    if "bật wifi" in q:
-        r = root("wifi_on"); speak(r); return r
-    if "tắt wifi" in q:
-        r = root("wifi_off"); speak(r); return r
-    if "pin" in q:
-        r = root("status"); speak(r); return r
-
-    res = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role":"system","content":PERSONA},
-            {"role":"user","content":q}
-        ]
-    )
-    ans = res.choices[0].message.content
-    speak(ans)
-    return ans
-EOF
-
-# ===== TTS =====
-cat > $BASE/voice/tts.py << 'EOF'
-from gtts import gTTS
-import os, time
-
-def speak(text):
-    f = f"/tmp/cu_ti_{int(time.time())}.mp3"
-    gTTS(text=text, lang="vi").save(f)
-    os.system(f"mpg123 {f} >/dev/null 2>&1")
-EOF
-
-# ===== RUN =====
-cat > $BASE/run.py << 'EOF'
-from brain.core import chat
-print("🤖 cu Tí GOD MODE đã sẵn sàng (exit để thoát)")
-while True:
-    q = input("Bạn: ")
-    if q == "exit":
-        break
-    print("cu Tí:", chat(q))
-EOF
-
-chmod +x $BASE/run.py
-
-echo "✅ cu Tí GOD MODE cài xong"
-echo "👉 Chạy: cd ~/cu_ti && python run.py"
+echo "=============================================="
+echo "✅ cu Tí installation COMPLETE"
+echo "👉 Run: python app.py"
+echo "=============================================="

@@ -1,20 +1,18 @@
-# cu Tí 🤖
+# 🤖 cu Tí – GOD MODE (Termux AI Assistant)
 
-**cu Tí** là AI hệ điều hành cá nhân chạy trên **Android (Termux + Root)**  
-Dự án dùng cho **nghiên cứu AI tự học – tự hành động – có kiểm soát**.
+cu Tí là trợ lý AI nghiên cứu chạy trên Android (Termux),
+thiết kế theo hướng:
+- An toàn
+- Có bộ nhớ
+- Có thể mở rộng
+- Không phá môi trường Termux
 
----
-
-## ⚠️ CẢNH BÁO
-- Chỉ dùng cho **thiết bị nghiên cứu**
-- Có quyền ROOT
-- Có kill switch an toàn
-
----
-
-## 🚀 CÀI ĐẶT NHANH
+## 🚀 Cài đặt (1 lần duy nhất)
 
 ```bash
-git clone https://github.com/USERNAME/Cu_Ti.git
-cd Cu_Ti
+git clone https://github.com/llthtt/cau_ai.git
+cd cau_ai
+chmod +x cu_ti_godmode_installer.sh
 bash cu_ti_godmode_installer.sh
+
+
